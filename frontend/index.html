@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agri-Advisor Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f7f2;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #2e7d32;
+        }
+        .card {
+            background: white;
+            padding: 15px;
+            margin: 15px auto;
+            width: 80%;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #2e7d32;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 5px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🌾 Agri-Advisor Smart Farming Dashboard</h1>
+
+<div class="card">
+    <h3>Enter Farm Details</h3>
+    Latitude: <input id="lat" type="number" step="0.01" value="13.08">
+    Longitude: <input id="lon" type="number" step="0.01" value="80.27">
+    Area (acres): <input id="area" type="number" value="2">
+    Workers: <input id="workers" type="number" value="3">
+    <br><br>
+    <button onclick="getAdvisory()">Get Farm Advisory</button>
+</div>
+
+<div class="card" id="results" style="display:none;">
+    <h2>Farm Advisory Results</h2>
+    <p><b>Recommended Crop:</b> <span id="crop"></span></p>
+    <p><b>Temperature:</b> <span id="temp"></span> °C</p>
+    <p><b>Humidity:</b> <span id="humidity"></span> %</p>
+    <p><b>Rainfall:</b> <span id="rain"></span> mm</p>
+    <p><b>Labor Plan:</b> <span id="labor"></span></p>
+</div>
+
+<div class="card">
+    <canvas id="soilChart"></canvas>
+</div>
+
+<script>
+async function getAdvisory() {
+    const lat = document.getElementById("lat").value;
+    const lon = document.getElementById("lon").value;
+    const area = document.getElementById("area").value;
+    const workers = document.getElementById("workers").value;
+
+    const response = await fetch(`http://127.0.0.1:8000/full-advisory?lat=${lat}&lon=${lon}&area=${area}&workers=${workers}`);
+    const data = await response.json();
+
+    document.getElementById("results").style.display = "block";
+    document.getElementById("crop").innerText = data.recommended_crop;
+    document.getElementById("temp").innerText = data.weather.temperature;
+    document.getElementById("humidity").innerText = data.weather.humidity;
+    document.getElementById("rain").innerText = data.weather.rainfall;
+    document.getElementById("labor").innerText = data.labor_plan;
+
+    const soil = data.simulated_soil;
+
+    new Chart(document.getElementById("soilChart"), {
+        type: 'bar',
+        data: {
+            labels: ['Nitrogen', 'Phosphorus', 'Potassium', 'pH'],
+            datasets: [{
+                label: 'Soil Health Levels',
+                data: [soil.nitrogen, soil.phosphorus, soil.potassium, soil.ph],
+            }]
+        }
+    });
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Agri-Advisor AI Platform</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+    margin:0;
+    font-family:'Segoe UI',sans-serif;
+    background: radial-gradient(circle at top left,#0f2027,#203a43,#2c5364);
+    color:white;
+    overflow-x:hidden;
+}
+header{
+    text-align:center;
+    padding:25px;
+    font-size:32px;
+    font-weight:700;
+    letter-spacing:1px;
+    background:rgba(255,255,255,0.05);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,0.1);
+    animation:slideDown 1s ease;
+}
+.container{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:25px;
+    padding:25px;
+}
+.card{
+    background:rgba(255,255,255,0.07);
+    border-radius:18px;
+    padding:20px;
+    backdrop-filter:blur(18px);
+    box-shadow:0 10px 40px rgba(0,0,0,0.4);
+    animation:fadeUp 1s ease;
+}
+.card h3{
+    margin-top:0;
+    font-weight:600;
+    letter-spacing:0.5px;
+}
+#map{height:350px;border-radius:12px;}
+button{
+    margin-top:10px;
+    padding:10px 18px;
+    border:none;
+    border-radius:8px;
+    background:linear-gradient(45deg,#00e676,#1de9b6);
+    color:black;
+    font-weight:bold;
+    cursor:pointer;
+    transition:all .3s;
+}
+button:hover{transform:scale(1.08);}
+.stats{
+    display:flex;
+    justify-content:space-around;
+    text-align:center;
+}
+.stat h2{
+    margin:5px 0;
+    color:#1de9b6;
+}
+.chat-box{
+    height:260px;
+    overflow-y:auto;
+    background:rgba(0,0,0,0.35);
+    padding:10px;
+    border-radius:8px;
+}
+input{
+    width:100%;
+    padding:8px;
+    margin-top:10px;
+    border-radius:6px;
+    border:none;
+}
+canvas{margin-top:10px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+
+<body>
+
+<header>🌾 Agri-Advisor — AI Driven Smart Farming</header>
+
+<div class="container">
+
+<div>
+    <div class="card">
+        <h3>📍 Farm Location Intelligence</h3>
+        <div id="map"></div>
+        Area (acres): <input id="area" type="number" value="2">
+        Workers: <input id="workers" type="number" value="3">
+        <button onclick="runAdvisory()">Run AI Advisory</button>
+    </div>
+
+    <div class="card">
+        <h3>🌱 Soil Health Simulation</h3>
+        <canvas id="soilChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>📊 Machine Learning Model Performance</h3>
+        <canvas id="modelChart"></canvas>
+    </div>
+</div>
+
+<div>
+    <div class="card">
+        <h3>🤖 AI Farm Assistant</h3>
+        <div class="chat-box" id="chatBox"></div>
+        <input id="chatInput" placeholder="Ask about crops, fertilizer..." onkeypress="sendChat(event)">
+    </div>
+</div>
+
+</div>
+
+<script>
+let lat=20, lon=78;
+const map=L.map('map').setView([lat,lon],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let marker;
+map.on('click',e=>{
+    lat=e.latlng.lat;
+    lon=e.latlng.lng;
+    if(marker) marker.remove();
+    marker=L.marker([lat,lon]).addTo(map);
+});
+
+let soilChartInstance;
+
+async function runAdvisory(){
+    const area=document.getElementById("area").value;
+    const workers=document.getElementById("workers").value;
+
+    const res=await fetch(`http://127.0.0.1:8000/full-advisory?lat=${lat}&lon=${lon}&area=${area}&workers=${workers}`);
+    const data=await res.json();
+    const soil=data.simulated_soil;
+
+    if(soilChartInstance) soilChartInstance.destroy();
+
+    soilChartInstance=new Chart(document.getElementById("soilChart"),{
+        type:'radar',
+        data:{
+            labels:['Nitrogen','Phosphorus','Potassium','pH'],
+            datasets:[{
+                label:'Soil Health',
+                data:[soil.nitrogen,soil.phosphorus,soil.potassium,soil.ph],
+                borderColor:'#1de9b6'
+            }]
+        }
+    });
+
+    addMessage("AI",`Recommended Crop: ${data.recommended_crop}`);
+    addMessage("AI",`Labor Plan: ${data.labor_plan.total_hours} hours using ${data.labor_plan.workers_used} workers`);
+}
+
+async function sendChat(e){
+    if(e.key==="Enter"){
+        const msg=chatInput.value;
+        addMessage("You",msg);
+        chatInput.value="";
+
+        const res=await fetch("http://127.0.0.1:8000/ai-assistant",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(msg)
+        });
+        const data=await res.json();
+        addMessage("AI",data.response);
+    }
+}
+
+function addMessage(sender,text){
+    chatBox.innerHTML+=`<p><b>${sender}:</b> ${text}</p>`;
+    chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+async function loadModelStats(){
+    const res=await fetch("http://127.0.0.1:8000/model-stats");
+    const stats=await res.json();
+
+    new Chart(document.getElementById("modelChart"),{
+        type:'bar',
+        data:{
+            labels:['Accuracy','Precision','Recall','F1 Score'],
+            datasets:[{
+                label:'Model Performance',
+                data:[stats.accuracy,stats.precision,stats.recall,stats.f1],
+                backgroundColor:'#1de9b6'
+            }]
+        }
+    });
+}
+
+loadModelStats();
+</script>
+
+</body>
+</html>
